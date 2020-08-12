@@ -164,6 +164,7 @@ func (cc *ConsulConnect) Canonicalize() {
 
 	cc.SidecarService.Canonicalize()
 	cc.SidecarTask.Canonicalize()
+	cc.Gateway.Canonicalize()
 }
 
 // ConsulSidecarService represents a Consul Connect SidecarService jobspec
@@ -308,7 +309,9 @@ type ConsulGateway struct {
 }
 
 func (g *ConsulGateway) Canonicalize() {
+	fmt.Println("api/ConsulGateway Canon")
 	if g == nil {
+		fmt.Println("api/CG Canon nil")
 		return
 	}
 	g.Proxy.Canonicalize()
@@ -345,7 +348,9 @@ type ConsulGatewayProxy struct {
 }
 
 func (p *ConsulGatewayProxy) Canonicalize() {
+	fmt.Println("api CGP Canon")
 	if p == nil {
+		fmt.Println("api CGP Canon nil")
 		return
 	}
 
@@ -354,8 +359,10 @@ func (p *ConsulGatewayProxy) Canonicalize() {
 		p.ConnectTimeout = timeToPtr(5 * time.Second)
 	}
 
+	fmt.Println("api CGP Canonicalize")
 	if p.EnvoyDNSDiscoveryType == "" {
 		// same as default from consul
+		fmt.Println("api CGP Canonicalize LOGICAL_DNS")
 		p.EnvoyDNSDiscoveryType = "LOGICAL_DNS"
 	}
 

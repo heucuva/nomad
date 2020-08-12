@@ -283,7 +283,7 @@ func (j *Job) Register(args *structs.JobRegisterRequest, reply *structs.JobRegis
 	// For now we do this as a blocking operation that prevents the job from being
 	// submitted if the configuration entries cannot be set in Consul. There's
 	// probably room for improvement here.
-	fmt.Println("AAA")
+	fmt.Println("nomad/job_endpoint set config entries")
 	for service, entry := range args.Job.ConfigEntries() {
 		fmt.Println("conig entry, service:", service, "entry:", entry)
 		ctx := context.Background()
@@ -291,7 +291,7 @@ func (j *Job) Register(args *structs.JobRegisterRequest, reply *structs.JobRegis
 			return err
 		}
 	}
-	fmt.Println("BBB")
+	fmt.Println("nomad/job_endpoint done setting config entries")
 
 	// Enforce Sentinel policies. Pass a copy of the job to prevent
 	// sentinel from altering it.

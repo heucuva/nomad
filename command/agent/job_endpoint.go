@@ -1345,9 +1345,12 @@ func apiConnectGatewayProxyToStructs(in *api.ConsulGatewayProxy) *structs.Consul
 }
 
 func apiConnectIngressGatewayToStructs(in *api.ConsulIngressConfigEntry) *structs.ConsulIngressConfigEntry {
+	fmt.Println("je A")
 	if in == nil {
+		fmt.Println("je B")
 		return nil
 	}
+	fmt.Println("je C")
 
 	return &structs.ConsulIngressConfigEntry{
 		TLS:       apiConnectGatewayTLSConfig(in.TLS),
