@@ -1255,7 +1255,19 @@ func (a *ConsulGatewayBindAddress) Copy() *ConsulGatewayBindAddress {
 }
 
 func (a *ConsulGatewayBindAddress) Validate() error {
-	panic("todo")
+	if a == nil {
+		return nil
+	}
+
+	if a.Address == "" {
+		return fmt.Errorf("Consul Gateway Bind Address must be set")
+	}
+
+	if a.Port <= 0 {
+		return fmt.Errorf("Consul Gateway Bind Address must set valid Port")
+	}
+
+	return nil
 }
 
 // ConsulGatewayProxy is used to tune parameters of the proxy instance acting as
@@ -1338,7 +1350,26 @@ func (p *ConsulGatewayProxy) Equals(o *ConsulGatewayProxy) bool {
 }
 
 func (p *ConsulGatewayProxy) Validate() error {
-	panic("todo")
+	if p == nil {
+		return nil
+	}
+
+	if p.ConnectTimeout == nil {
+		return fmt.Errorf("Consul Gateway Proxy connection_timeout must be set")
+	}
+
+	dnsTypes := []string{"STRICT_DNS", "LOGICAL_DNS"}
+	if !helper.SliceStringContains(dnsTypes, p.EnvoyDNSDiscoveryType) {
+		return fmt.Errorf("Consul Gateway Proxy does not support DNS discovery type %q", p.EnvoyDNSDiscoveryType)
+	}
+
+	for _, bindAddr := range p.EnvoyGatewayBindAddresses {
+		if err := bindAddr.Validate(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // ConsulGatewayTLSConfig is used to configure TLS for a gateway.
@@ -1480,7 +1511,7 @@ func (l *ConsulIngressListener) Validate() error {
 	}
 
 	if len(l.Services) == 0 {
-		return fmt.Errorf("Consul Ingress Listener requires one or more services defined")
+		return fmt.Errorf("Consul Ingress Listener requires one or more services")
 	}
 
 	for _, service := range l.Services {

@@ -682,3 +682,231 @@ func TestConsulGateway_ingressListenersEqual(t *testing.T) {
 
 	require.True(t, ingressListenersEqual(ils1, reversed))
 }
+
+func TestConsulGateway_Validate(t *testing.T) {
+	t.Run("bad proxy", func(t *testing.T) {
+		err := (&ConsulGateway{
+			Proxy: &ConsulGatewayProxy{
+				ConnectTimeout: nil,
+			},
+			Ingress: nil,
+		}).Validate()
+		require.EqualError(t, err, "Consul Gateway Proxy connection_timeout must be set")
+	})
+
+	t.Run("bad ingress config entry", func(t *testing.T) {
+		err := (&ConsulGateway{
+			Ingress: &ConsulIngressConfigEntry{
+				Listeners: nil,
+			},
+		}).Validate()
+		require.EqualError(t, err, "Consul Ingress Gateway requires at least one listener")
+	})
+}
+
+func TestConsulGatewayBindAddress_Validate(t *testing.T) {
+	t.Run("no address", func(t *testing.T) {
+		err := (&ConsulGatewayBindAddress{
+			Address: "",
+			Port:    2000,
+		}).Validate()
+		require.EqualError(t, err, "Consul Gateway Bind Address must be set")
+	})
+
+	t.Run("invalid port", func(t *testing.T) {
+		err := (&ConsulGatewayBindAddress{
+			Address: "10.0.0.1",
+			Port:    0,
+		}).Validate()
+		require.EqualError(t, err, "Consul Gateway Bind Address must set valid Port")
+	})
+
+	t.Run("ok", func(t *testing.T) {
+		err := (&ConsulGatewayBindAddress{
+			Address: "10.0.0.1",
+			Port:    2000,
+		}).Validate()
+		require.NoError(t, err)
+	})
+}
+
+func TestConsulGatewayProxy_Validate(t *testing.T) {
+	t.Run("no timeout", func(t *testing.T) {
+		err := (&ConsulGatewayProxy{
+			ConnectTimeout:        nil,
+			EnvoyDNSDiscoveryType: "LOGICAL_DNS",
+		}).Validate()
+		require.EqualError(t, err, "Consul Gateway Proxy connection_timeout must be set")
+	})
+
+	t.Run("invalid bind address", func(t *testing.T) {
+		err := (&ConsulGatewayProxy{
+			ConnectTimeout:        helper.TimeToPtr(1 * time.Second),
+			EnvoyDNSDiscoveryType: "LOGICAL_DNS",
+			EnvoyGatewayBindAddresses: map[string]*ConsulGatewayBindAddress{
+				"service1": {
+					Address: "10.0.0.1",
+					Port:    0,
+				}},
+		}).Validate()
+		require.EqualError(t, err, "Consul Gateway Bind Address must set valid Port")
+	})
+
+	t.Run("invalid dns discovery type", func(t *testing.T) {
+		err := (&ConsulGatewayProxy{
+			ConnectTimeout:        helper.TimeToPtr(1 * time.Second),
+			EnvoyDNSDiscoveryType: "INVALID_DNS",
+		}).Validate()
+		require.EqualError(t, err, `Consul Gateway Proxy does not support DNS discovery type "INVALID_DNS"`)
+	})
+
+	t.Run("ok with nothing set", func(t *testing.T) {
+		err := (&ConsulGatewayProxy{
+			ConnectTimeout:        helper.TimeToPtr(1 * time.Second),
+			EnvoyDNSDiscoveryType: "LOGICAL_DNS",
+		}).Validate()
+		require.NoError(t, err)
+	})
+
+	t.Run("ok with everything set", func(t *testing.T) {
+		err := (&ConsulGatewayProxy{
+			ConnectTimeout: helper.TimeToPtr(1 * time.Second),
+			EnvoyGatewayBindAddresses: map[string]*ConsulGatewayBindAddress{
+				"service1": {
+					Address: "10.0.0.1",
+					Port:    2000,
+				}},
+			EnvoyGatewayBindTaggedAddresses: true,
+			EnvoyGatewayNoDefaultBind:       true,
+			EnvoyDNSDiscoveryType:           "STRICT_DNS",
+		}).Validate()
+		require.NoError(t, err)
+	})
+}
+
+func TestConsulIngressService_Validate(t *testing.T) {
+	t.Run("invalid name", func(t *testing.T) {
+		err := (&ConsulIngressService{
+			Name: "",
+		}).Validate(true)
+		require.EqualError(t, err, "Consul Ingress Service requires a name")
+	})
+
+	t.Run("http missing hosts", func(t *testing.T) {
+		err := (&ConsulIngressService{
+			Name: "service1",
+		}).Validate(true)
+		require.EqualError(t, err, "Consul Ingress Service requires one or more hosts when using HTTP protocol")
+	})
+
+	t.Run("tcp extraneous hosts", func(t *testing.T) {
+		err := (&ConsulIngressService{
+			Name:  "service1",
+			Hosts: []string{"host1"},
+		}).Validate(false)
+		require.EqualError(t, err, "Consul Ingress Service supports hosts only when using HTTP protocol")
+	})
+
+	t.Run("ok tcp", func(t *testing.T) {
+		err := (&ConsulIngressService{
+			Name: "service1",
+		}).Validate(false)
+		require.NoError(t, err)
+	})
+
+	t.Run("ok http", func(t *testing.T) {
+		err := (&ConsulIngressService{
+			Name:  "service1",
+			Hosts: []string{"host1"},
+		}).Validate(true)
+		require.NoError(t, err)
+	})
+}
+
+func TestConsulIngressListener_Validate(t *testing.T) {
+	t.Run("invalid port", func(t *testing.T) {
+		err := (&ConsulIngressListener{
+			Port:     0,
+			Protocol: "tcp",
+			Services: []*ConsulIngressService{{
+				Name: "service1",
+			}},
+		}).Validate()
+		require.EqualError(t, err, "Consul Ingress Listener requires valid Port")
+	})
+
+	t.Run("invalid protocol", func(t *testing.T) {
+		err := (&ConsulIngressListener{
+			Port:     2000,
+			Protocol: "gopher",
+			Services: []*ConsulIngressService{{
+				Name: "service1",
+			}},
+		}).Validate()
+		require.EqualError(t, err, `Consul Ingress Listener requires protocol of "http" or "tcp", got "gopher"`)
+	})
+
+	t.Run("no services", func(t *testing.T) {
+		err := (&ConsulIngressListener{
+			Port:     2000,
+			Protocol: "tcp",
+			Services: nil,
+		}).Validate()
+		require.EqualError(t, err, "Consul Ingress Listener requires one or more services")
+	})
+
+	t.Run("invalid service", func(t *testing.T) {
+		err := (&ConsulIngressListener{
+			Port:     2000,
+			Protocol: "tcp",
+			Services: []*ConsulIngressService{{
+				Name: "",
+			}},
+		}).Validate()
+		require.EqualError(t, err, "Consul Ingress Service requires a name")
+	})
+
+	t.Run("ok", func(t *testing.T) {
+		err := (&ConsulIngressListener{
+			Port:     2000,
+			Protocol: "tcp",
+			Services: []*ConsulIngressService{{
+				Name: "service1",
+			}},
+		}).Validate()
+		require.NoError(t, err)
+	})
+}
+
+func TestConsulIngressConfigEntry_Validate(t *testing.T) {
+	t.Run("no listeners", func(t *testing.T) {
+		err := (&ConsulIngressConfigEntry{}).Validate()
+		require.EqualError(t, err, "Consul Ingress Gateway requires at least one listener")
+	})
+
+	t.Run("invalid listener", func(t *testing.T) {
+		err := (&ConsulIngressConfigEntry{
+			Listeners: []*ConsulIngressListener{{
+				Port:     9000,
+				Protocol: "tcp",
+			}},
+		}).Validate()
+		require.EqualError(t, err, "Consul Ingress Listener requires one or more services")
+	})
+
+	t.Run("full", func(t *testing.T) {
+		err := (&ConsulIngressConfigEntry{
+			TLS: &ConsulGatewayTLSConfig{
+				Enabled: true,
+			},
+			Listeners: []*ConsulIngressListener{{
+				Port:     9000,
+				Protocol: "tcp",
+				Services: []*ConsulIngressService{{
+					Name: "service1",
+				}},
+			}},
+		}).Validate()
+		require.NoError(t, err)
+	})
+}
