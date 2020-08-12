@@ -309,9 +309,7 @@ type ConsulGateway struct {
 }
 
 func (g *ConsulGateway) Canonicalize() {
-	fmt.Println("api/ConsulGateway Canon")
 	if g == nil {
-		fmt.Println("api/CG Canon nil")
 		return
 	}
 	g.Proxy.Canonicalize()
@@ -334,6 +332,14 @@ type ConsulGatewayBindAddress struct {
 	Port    int    `mapstructure:"port"`
 }
 
+const (
+	defaultDNSDiscoveryType = "LOGICAL_DNS"
+)
+
+var (
+	defaultGatewayConnectTimeout = 5 * time.Second
+)
+
 // ConsulGatewayProxy is used to tune parameters of the proxy instance acting as
 // one of the forms of Connect gateways that Consul supports.
 //
@@ -344,26 +350,22 @@ type ConsulGatewayProxy struct {
 	EnvoyGatewayBindAddresses       map[string]*ConsulGatewayBindAddress `mapstructure:"envoy_gateway_bind_addresses"`
 	EnvoyGatewayNoDefaultBind       bool                                 `mapstructure:"envoy_gateway_no_default_bind"`
 	EnvoyDNSDiscoveryType           string                               `mapstructure:"envoy_dns_discovery_type"`
-	Config                          map[string]interface{}               // escape hatch
+	Config                          map[string]interface{}               // escape hatch envoy config
 }
 
 func (p *ConsulGatewayProxy) Canonicalize() {
-	fmt.Println("api CGP Canon")
 	if p == nil {
-		fmt.Println("api CGP Canon nil")
 		return
 	}
 
 	if p.ConnectTimeout == nil {
 		// same as the default from consul
-		p.ConnectTimeout = timeToPtr(5 * time.Second)
+		p.ConnectTimeout = timeToPtr(defaultGatewayConnectTimeout)
 	}
 
-	fmt.Println("api CGP Canonicalize")
 	if p.EnvoyDNSDiscoveryType == "" {
 		// same as default from consul
-		fmt.Println("api CGP Canonicalize LOGICAL_DNS")
-		p.EnvoyDNSDiscoveryType = "LOGICAL_DNS"
+		p.EnvoyDNSDiscoveryType = defaultDNSDiscoveryType
 	}
 
 	if len(p.EnvoyGatewayBindAddresses) == 0 {
@@ -460,6 +462,10 @@ func (s *ConsulIngressService) Copy() *ConsulIngressService {
 	}
 }
 
+const (
+	defaultIngressListenerProtocol = "tcp"
+)
+
 // ConsulIngressListener is used to configure a listener on a Consul Ingress
 // Gateway.
 type ConsulIngressListener struct {
@@ -475,7 +481,7 @@ func (l *ConsulIngressListener) Canonicalize() {
 
 	if l.Protocol == "" {
 		// same as default from consul
-		l.Protocol = "tcp"
+		l.Protocol = defaultIngressListenerProtocol
 	}
 
 	if len(l.Services) == 0 {

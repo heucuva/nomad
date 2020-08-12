@@ -763,7 +763,6 @@ func (c *ConsulConnect) Validate() error {
 	}
 
 	if c.IsGateway() {
-		fmt.Println("service/ConsulConnect Validate - IsGateway")
 		if err := c.Gateway.Validate(); err != nil {
 			return err
 		}
@@ -1205,8 +1204,6 @@ func (g *ConsulGateway) Equals(o *ConsulGateway) bool {
 }
 
 func (g *ConsulGateway) Validate() error {
-	fmt.Println("services/ConsulGateway.Validate")
-
 	if g == nil {
 		return nil
 	}
@@ -1219,7 +1216,6 @@ func (g *ConsulGateway) Validate() error {
 
 	// eventually one of: ingress, terminating, mesh
 	if g.Ingress != nil {
-		fmt.Println("CG Validate Ingress not nil")
 		return g.Ingress.Validate()
 	}
 
@@ -1561,18 +1557,14 @@ func (e *ConsulIngressConfigEntry) Copy() *ConsulIngressConfigEntry {
 		return nil
 	}
 
-	fmt.Println("Copy A")
-
 	var listeners []*ConsulIngressListener = nil
 	if n := len(e.Listeners); n > 0 {
-		fmt.Println("COPY B")
 		listeners = make([]*ConsulIngressListener, n)
 		for i := 0; i < n; i++ {
 			listeners[i] = e.Listeners[i].Copy()
 		}
 	}
 
-	fmt.Println("COPY C")
 	return &ConsulIngressConfigEntry{
 		TLS:       e.TLS.Copy(),
 		Listeners: listeners,
@@ -1592,27 +1584,20 @@ func (e *ConsulIngressConfigEntry) Equals(o *ConsulIngressConfigEntry) bool {
 }
 
 func (e *ConsulIngressConfigEntry) Validate() error {
-	fmt.Println("CICE Validate A")
-
 	if e == nil {
-		fmt.Println("CICE Validate B")
 		return nil
 	}
 
-	fmt.Println("CICE Validate C")
 	if len(e.Listeners) == 0 {
-		fmt.Println("CICE Validate D")
 		return fmt.Errorf("Consul Ingress Gateway requires at least one listener")
 	}
 
-	fmt.Println("CICE Validate E")
 	for _, listener := range e.Listeners {
 		if err := listener.Validate(); err != nil {
 			return err
 		}
 	}
 
-	fmt.Println("CICE Validate F")
 	return nil
 }
 

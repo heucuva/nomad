@@ -3916,8 +3916,6 @@ func (j *Job) Copy() *Job {
 
 // Validate is used to sanity check a job input
 func (j *Job) Validate() error {
-	fmt.Println("structs/Job.Validate")
-
 	var mErr multierror.Error
 
 	if j.Region == "" && j.Multiregion == nil {
