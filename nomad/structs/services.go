@@ -762,6 +762,14 @@ func (c *ConsulConnect) Validate() error {
 		return fmt.Errorf("Consul Connect must be exclusively native, make use of a sidecar, or represent a Gateway")
 	}
 
+	if c.IsGateway() {
+		if err := c.Gateway.Validate(); err != nil {
+			return nil
+		}
+	}
+
+	// The Native and Sidecar cases are validated up at the service level.
+
 	return nil
 }
 
@@ -1195,6 +1203,25 @@ func (g *ConsulGateway) Equals(o *ConsulGateway) bool {
 	return true
 }
 
+func (g *ConsulGateway) Validate() error {
+	if g == nil {
+		return nil
+	}
+
+	if g.Proxy != nil {
+		if err := g.Proxy.Validate(); err != nil {
+			return err
+		}
+	}
+
+	// eventually one of: ingress, terminating, mesh
+	if g.Ingress != nil {
+		return g.Ingress.Validate()
+	}
+
+	return fmt.Errorf("Consul Gateway ingress Configuration Entry must be set")
+}
+
 type ConsulGatewayBindAddress struct {
 	Address string
 	Port    int
@@ -1225,6 +1252,10 @@ func (a *ConsulGatewayBindAddress) Copy() *ConsulGatewayBindAddress {
 		Address: a.Address,
 		Port:    a.Port,
 	}
+}
+
+func (a *ConsulGatewayBindAddress) Validate() error {
+	panic("todo")
 }
 
 // ConsulGatewayProxy is used to tune parameters of the proxy instance acting as
@@ -1306,6 +1337,10 @@ func (p *ConsulGatewayProxy) Equals(o *ConsulGatewayProxy) bool {
 	return true
 }
 
+func (p *ConsulGatewayProxy) Validate() error {
+	panic("todo")
+}
+
 // ConsulGatewayTLSConfig is used to configure TLS for a gateway.
 type ConsulGatewayTLSConfig struct {
 	Enabled bool
@@ -1368,6 +1403,24 @@ func (s *ConsulIngressService) Equals(o *ConsulIngressService) bool {
 	return helper.CompareSliceSetString(s.Hosts, o.Hosts)
 }
 
+func (s *ConsulIngressService) Validate(isHTTP bool) error {
+	if s == nil {
+		return nil
+	}
+
+	if s.Name == "" {
+		return fmt.Errorf("Consul Ingress Service requires a name")
+	}
+
+	if isHTTP && len(s.Hosts) == 0 {
+		return fmt.Errorf("Consul Ingress Service requires one or more hosts when using HTTP protocol")
+	} else if !isHTTP && len(s.Hosts) > 0 {
+		return fmt.Errorf("Consul Ingress Service supports hosts only when using HTTP protocol")
+	}
+
+	return nil
+}
+
 // ConsulIngressListener is used to configure a listener on a Consul Ingress
 // Gateway.
 type ConsulIngressListener struct {
@@ -1410,6 +1463,33 @@ func (l *ConsulIngressListener) Equals(o *ConsulIngressListener) bool {
 	}
 
 	return ingressServicesEqual(l.Services, o.Services)
+}
+
+func (l *ConsulIngressListener) Validate() error {
+	if l == nil {
+		return nil
+	}
+
+	if l.Port <= 0 {
+		return fmt.Errorf("Consul Ingress Listener requires valid Port")
+	}
+
+	protocols := []string{"http", "tcp"}
+	if !helper.SliceStringContains(protocols, l.Protocol) {
+		return fmt.Errorf(`Consul Ingress Listener requires protocol of "http" or "tcp", got %q`, l.Protocol)
+	}
+
+	if len(l.Services) == 0 {
+		return fmt.Errorf("Consul Ingress Listener requires one or more services defined")
+	}
+
+	for _, service := range l.Services {
+		if err := service.Validate(l.Protocol == "http"); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func ingressServicesEqual(servicesA, servicesB []*ConsulIngressService) bool {
@@ -1470,6 +1550,24 @@ func (e *ConsulIngressConfigEntry) Equals(o *ConsulIngressConfigEntry) bool {
 	}
 
 	return ingressListenersEqual(e.Listeners, o.Listeners)
+}
+
+func (e *ConsulIngressConfigEntry) Validate() error {
+	if e == nil {
+		return nil
+	}
+
+	if len(e.Listeners) == 0 {
+		return fmt.Errorf("Consul Ingress Gateway requires at least one listener")
+	}
+
+	for _, listener := range e.Listeners {
+		if err := listener.Validate(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func ingressListenersEqual(listenersA, listenersB []*ConsulIngressListener) bool {
